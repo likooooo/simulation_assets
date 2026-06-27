@@ -15,11 +15,9 @@ simulation = get_simulation_module()
 
 from oghma_core import (
     _structure_pos_from_layers,
-    gpvdm_y_to_z_cathode_first_um,
     gpvdm_y_to_z_simulation_um,
     load_oghma_project,
     tmm_stack_z_edges_from_bar_thicknesses,
-    z_cathode_first_to_gpvdm_y_um,
     z_simulation_to_gpvdm_y_um,
 )
 from oghma_oled_utils import build_oghma_oled_passive_stack_ito_al
@@ -37,13 +35,6 @@ def test_gpvdm_y_z_identity() -> None:
     y = np.linspace(0.0, 0.5, 5)
     np.testing.assert_allclose(gpvdm_y_to_z_simulation_um(y), y)
     np.testing.assert_allclose(z_simulation_to_gpvdm_y_um(y), y)
-
-
-def test_cathode_first_roundtrip() -> None:
-    total = 0.8
-    y = np.array([0.0, 0.2, 0.8])
-    z = gpvdm_y_to_z_cathode_first_um(y, total)
-    np.testing.assert_allclose(z_cathode_first_to_gpvdm_y_um(z, total), y)
 
 
 def test_tmm_stack_z_edges_from_bar_thicknesses() -> None:

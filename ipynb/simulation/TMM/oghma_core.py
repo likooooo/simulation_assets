@@ -93,12 +93,6 @@ def _read_oghma_spectrum(spectrum_path: str) -> Any:
         return sdp.read_at_query_path(db, sdp.spectrum_query_keys(spectrum_path))
 
 
-def _complex_from_material_nk(nk: Any) -> complex:
-    if callable(getattr(nk, "real", None)):
-        return complex(nk.real(), nk.imag())
-    return complex(nk.real, nk.imag)
-
-
 def preload_oghma_materials(
     material_paths: Iterable[str],
 ) -> list[str]:
@@ -118,7 +112,7 @@ def load_oghma_material_nk(
     mat = _read_oghma_material(material_path)
     wl_arr = np.atleast_1d(np.asarray(wl_um, dtype=float))
     nk = np.asarray(
-        [_complex_from_material_nk(mat.nk_at_wavelength_um(float(w))) for w in wl_arr],
+        [_cplx_from_py(mat.nk_at_wavelength_um(float(w))) for w in wl_arr],
         dtype=complex,
     )
     if np.ndim(wl_um) == 0:
@@ -512,41 +506,6 @@ def z_simulation_to_gpvdm_y_um(
 ) -> np.ndarray | float:
     """Inverse of :func:`gpvdm_y_to_z_simulation_um` (identity for unified OLED z)."""
     return gpvdm_y_to_z_simulation_um(z_um, total_thickness_um=total_thickness_um)
-
-
-def gpvdm_y_to_z_cathode_first_um(y_um: np.ndarray | float, total_thickness_um: float) -> np.ndarray | float:
-    """Legacy cathode-first simulation z (``z=0`` @ Al) used before stack unification."""
-    y_arr = np.asarray(y_um, dtype=float)
-    z_arr = float(total_thickness_um) - y_arr
-    if np.ndim(y_um) == 0:
-        return float(z_arr)
-    return z_arr
-
-
-def z_cathode_first_to_gpvdm_y_um(z_um: np.ndarray | float, total_thickness_um: float) -> np.ndarray | float:
-    """Convert legacy cathode-first simulation *z* back to gpvdm/Oghma *y*."""
-    z_arr = np.asarray(z_um, dtype=float)
-    y_arr = float(total_thickness_um) - z_arr
-    if np.ndim(z_um) == 0:
-        return float(y_arr)
-    return y_arr
-
-
-def oghma_y_to_emission_z_um(
-    y_um: np.ndarray | float,
-    total_thickness_um: float,
-) -> np.ndarray | float:
-    """Map Oghma outcoupling *y* to filmstack dipole depth *z* (``z = y`` at ITO epitaxy top).
-
-    Matches :func:`gpvdm_y_to_z_simulation_um` and ``get_structure_pos`` (epitaxy from ``z=0``).
-    """
-    return gpvdm_y_to_z_simulation_um(y_um, total_thickness_um=total_thickness_um)
-
-
-def y_oghma_to_z_um(y_m: np.ndarray | float, total_thickness_um: float) -> np.ndarray | float:
-    """Map Oghma epitaxy depth to passive TMM z (``z=y``; alias for gpvdm conversion)."""
-    y_um = np.asarray(y_m, dtype=float) * 1e6
-    return gpvdm_y_to_z_simulation_um(y_um, total_thickness_um=total_thickness_um)
 
 
 DEFAULT_OUTCOUPLING_U_INTEGRATION_POINTS = 64

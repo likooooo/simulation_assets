@@ -9,7 +9,6 @@ import numpy as np
 _RI = Path(__file__).resolve().parent / "refractiveindex" / "refractiveindex"
 if str(_RI) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(_RI))
-from download_material import *
 
 def plot_cutlines_with_error(c1, c2, label1="Data 1", label2="Data 2"):
     """

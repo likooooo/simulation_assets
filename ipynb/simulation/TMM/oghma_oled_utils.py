@@ -1,4 +1,4 @@
-"""ITO/Al OLED stacks and backward-compatible re-export shim for Oghma TMM utilities."""
+"""ITO/Al OLED stacks and re-export shim for Oghma TMM utilities."""
 
 from __future__ import annotations
 
@@ -1462,7 +1462,7 @@ def compute_oled_jv_optical_coupled_newton(
 
 
 # ---------------------------------------------------------------------------
-# Backward-compatible re-exports (notebooks import from this module)
+# Re-exports for notebooks (import oghma_core / oghma_fabry directly in new code)
 # ---------------------------------------------------------------------------
 
 from oghma_core import (  # noqa: E402
