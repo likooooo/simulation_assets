@@ -14,11 +14,11 @@ import matplotlib.pyplot as plt  # noqa: E402 — spectrum / EQE 1D plots
 import numpy as np
 import pandas as pd
 
-from oghma_runtime import oghma_project_dir, prepare_simulation, simulation_repo_root
+from oghma_runtime import bootstrap_tmm_session, DEFAULT_OLED_HELLO_PROJECT
 
-_RUNTIME = prepare_simulation()
-_REPO = simulation_repo_root()
+_, _RUNTIME, _ = bootstrap_tmm_session()
 import simulation  # noqa: E402
+import simulation_database_parser as sdp  # noqa: E402
 from oghma_core import (  # noqa: E402
     compare_arrays,
     compare_metrics,
@@ -28,10 +28,9 @@ from oghma_core import (  # noqa: E402
     load_oghma_optical_reference,
     load_oghma_project,
     plot_2d_compare,
-    resolve_oghma_materials_root,
 )
 from filmstack_visualizer import build_tmm_layers, layers_from_formula, plot_filmstack  # noqa: E402
-from oghma_fdtd_alignment import plot_1d_compare  # noqa: E402
+from oghma_fdtd_alignment import plot_1d_compare, report_oled_metrics  # noqa: E402
 from oghma_oled_utils import oled_emission_formula_from_project, oled_emission_materials_db  # noqa: E402
 from oghma_oled_utils import (  # noqa: E402
     compute_coupled_eqe_spectrum,
@@ -55,41 +54,8 @@ from oghma_oled_utils import (  # noqa: E402
 )
 from oghma_oled_utils import build_oghma_oled_emission_stack_ito_al  # noqa: E402
 
-DEFAULT_OLED_PROJECT = oghma_project_dir("oled", "01_hello_oled", repo=_REPO)
-
-
-def pass_fail(stats, rmse_thr, max_thr, peak_thr=None, min_corr=None) -> str:
-    ok = stats["rmse"] < rmse_thr and stats["max_abs"] < max_thr
-    if min_corr is not None and np.isfinite(stats.get("corr", np.nan)):
-        ok = ok and stats["corr"] >= min_corr
-    if peak_thr is not None and "peak_delta" in stats:
-        ok = ok and stats["peak_delta"] < peak_thr
-    return "PASS" if ok else "FAIL"
-
-
-def report_metrics(
-    alignment_report: list[dict],
-    name: str,
-    tmm: np.ndarray,
-    baseline: np.ndarray,
-    *,
-    x=None,
-    rmse_thr=0.02,
-    max_thr=0.05,
-    peak_thr=None,
-    min_corr=None,
-) -> dict:
-    stats = compare_metrics(
-        tmm, baseline, x=x, peak_axis=0 if x is not None and np.ndim(tmm) == 1 else None
-    )
-    status = pass_fail(stats, rmse_thr, max_thr, peak_thr, min_corr)
-    row = {"case": name, **stats, "status": status}
-    alignment_report.append(row)
-    print(
-        f"[{status}] {name}: RMSE={stats['rmse']:.4g}, "
-        f"max|err|={stats['max_abs']:.4g}, corr={stats.get('corr', float('nan')):.4f}"
-    )
-    return stats
+DEFAULT_OLED_PROJECT = DEFAULT_OLED_HELLO_PROJECT
+report_metrics = report_oled_metrics
 
 
 def main() -> None:
@@ -115,7 +81,7 @@ def main() -> None:
     bl = " (baseline)"
 
     print(f"RUNTIME={_RUNTIME}")
-    print(f"oghma_database/materials: {resolve_oghma_materials_root()}")
+    print(f"og/materials: {sdp.materials_root(init=True)}")
     print(f"project: {args.project}")
     print(f"simmode: {project.simmode}, thickness: {project.total_thickness_um:.3f} μm")
     print(f"λ: {wl_um[0]:.3f}–{wl_um[-1]:.3f} μm ({len(wl_um)} pts), y: {len(y_oghma_um)} pts")

@@ -287,7 +287,7 @@ compute_coupled_eqe_spectrum → v_eqe, v_luminance
 | `transfer_matrix` → `u=[0.0]` | `oghma_emission_u_values_from_project(02_oled_jv)` 输出 `[0.0]`；与 [`00_software_alignment_skills.md`](00_software_alignment_skills.md) 一致 |
 | `ray_theta_*` 不驱动 emission-TMM | `outcoupling_model=transfer_matrix` 时忽略 PL 层 `ray_theta_steps=180` |
 | 坐标 z = y | `gpvdm_y_to_z_simulation_um` 恒等；ITO @ y=0 ↔ TMM layer 1 @ z=0 |
-| nk 对齐 | `_make_oghma_optical_material`: union(n,α) 网格 + α→k + `from_tabulated` |
+| nk 对齐 | `_read_oghma_material()` → `simulation_database.read()` + `nk_at_wavelength_um()` |
 | OLED stack bookend | ITO(∞)\|layers\|Al(∞)，`depth=0` 半无限层 |
 | JV 扫描 | `(0.1, 4.0, 0.01)` 正确传入 |
 | η_PL | EML `pl_experimental_emission_efficiency_f2f=0.25` → `load_oghma_emission_efficiency()=0.25` |

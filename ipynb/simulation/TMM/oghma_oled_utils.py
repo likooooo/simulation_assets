@@ -12,6 +12,7 @@ import numpy as np
 from oghma_core import (
     OghmaProject,
     _cplx_from_py,
+    _heatmap_grid_from_series,
     _layers_from_builder,
     _list_indexed_snapshots,
     _load_indexed_snapshot,
@@ -397,18 +398,9 @@ def compute_oled_passive_absorption_profile_ito_al(
 # ---------------------------------------------------------------------------
 
 def _default_oled_jv_project() -> Path:
-    import os
+    from oghma_runtime import oghma_project_dir
 
-    db = os.environ.get("SIMULATION_DATABASE_DIR", "").strip()
-    if db:
-        return Path(db).resolve().parent / "oghma_projects" / "oled" / "02_oled_jv"
-    return (
-        Path(__file__).resolve().parents[3]
-        / "assets"
-        / "oghma_projects"
-        / "oled"
-        / "02_oled_jv"
-    )
+    return oghma_project_dir("oled", "02_oled_jv")
 
 
 DEFAULT_OLED_JV_PROJECT = _default_oled_jv_project()
@@ -557,15 +549,12 @@ def load_oghma_photon_reference(project: OghmaProject) -> dict[str, Any]:
     heat = parse_oghma_csv(path)
     wl = _oghma_axis_to_um(heat["x"], heat["meta"], axis="y")
     y_um = _oghma_axis_to_um(heat["y"], heat["meta"], axis="y")
-    density = heat["z"]
-    wl_unique = np.unique(wl)
-    y_unique = np.unique(y_um)
-    grid = np.full((len(wl_unique), len(y_unique)), np.nan)
-    wl_to_i = {w: i for i, w in enumerate(wl_unique)}
-    y_to_i = {y: i for i, y in enumerate(y_unique)}
-    for w, y, v in zip(wl, y_um, density):
-        grid[wl_to_i[w], y_to_i[y]] = v
-    return {"heat_wl_um": wl_unique, "heat_y_um": y_unique, "photon_density": grid}
+    grid_data = _heatmap_grid_from_series(wl, y_um, heat["z"])
+    return {
+        "heat_wl_um": grid_data["heat_wl_um"],
+        "heat_y_um": grid_data["heat_y_um"],
+        "photon_density": grid_data["grid"],
+    }
 
 
 def load_oghma_escape_reference(project: OghmaProject) -> dict[str, Any]:
@@ -582,17 +571,10 @@ def load_oghma_escape_reference(project: OghmaProject) -> dict[str, Any]:
         heat = parse_oghma_csv(heat_path)
         wl = _oghma_axis_to_um(heat["x"], heat["meta"], axis="y")
         y_um = _oghma_axis_to_um(heat["y"], heat["meta"], axis="y")
-        eta = heat["z"]
-        wl_unique = np.unique(wl)
-        y_unique = np.unique(y_um)
-        grid = np.full((len(wl_unique), len(y_unique)), np.nan)
-        wl_to_i = {w: i for i, w in enumerate(wl_unique)}
-        y_to_i = {y: i for i, y in enumerate(y_unique)}
-        for w, y, v in zip(wl, y_um, eta):
-            grid[wl_to_i[w], y_to_i[y]] = v
-        out["heat_wl_um"] = wl_unique
-        out["heat_y_um"] = y_unique
-        out["heat_eta"] = grid
+        grid_data = _heatmap_grid_from_series(wl, y_um, heat["z"])
+        out["heat_wl_um"] = grid_data["heat_wl_um"]
+        out["heat_y_um"] = grid_data["heat_y_um"]
+        out["heat_eta"] = grid_data["grid"]
 
     if lam_avg_y_path.is_file():
         d = parse_oghma_csv(lam_avg_y_path)
@@ -1462,65 +1444,12 @@ def compute_oled_jv_optical_coupled_newton(
 
 
 # ---------------------------------------------------------------------------
-# Re-exports for notebooks (import oghma_core / oghma_fabry directly in new code)
+# Re-exports for notebooks (import oghma_core directly in new code)
 # ---------------------------------------------------------------------------
 
 from oghma_core import (  # noqa: E402
-    build_oghma_passive_stack,
-    compare_metrics,
-    fdtd_input_combine_power,
-    filter_stack_layers,
-    list_oghma_optical_snapshots,
     load_oghma_optical_reference,
     load_oghma_optical_snapshot,
+    list_oghma_optical_snapshots,
     load_oghma_project,
-    normalize_rows,
-    passive_filter_stack_labels,
 )
-from oghma_fabry import (  # noqa: E402
-    build_fabry_perot_stack,
-    compute_fabry_emission_case_bc_spectra,
-    compute_fabry_emission_transfer,
-    compute_fabry_lam_e_norm,
-    compute_fabry_passive_transfer,
-    compute_fabry_reflection_ahead_of_z,
-    fabry_perot_interface_R_at_wl,
-    fabry_perot_stack_labels,
-    fabry_perot_thicknesses_um,
-    parse_fabry_perot_geometry,
-    plot_fabry_perot_fdtd_stack_section,
-)
-from oghma_bragg import (  # noqa: E402
-    build_bragg_fdtd_stack,
-    compute_bragg_emission_transfer,
-    compute_bragg_lam_e_norm,
-    compute_bragg_passive_transfer,
-    compute_bragg_reflection_ahead_of_z,
-    parse_bragg_grating_geometry,
-)
-from oghma_fdtd_alignment import (  # noqa: E402
-    display_alignment_reports,
-    evaluate_case,
-    load_fdtd_alignment_bundle,
-    plot_case_summary_grid,
-    plot_forward_source_diagnostic,
-    s_in_times_intensity,
-)
-from oghma_fdtd_source import (  # noqa: E402
-    integrate_incoherent_power,
-    predict_fdtd_output_spectrum_incoherent,
-)
-
-
-def air_layer_thickness_nm(project: OghmaProject) -> float:
-    from oghma_core import air_layer_thickness_um
-
-    return air_layer_thickness_um(project) * 1000.0
-
-
-def fabry_perot_thicknesses_nm(geom):  # noqa: ANN001
-    return [t * 1000.0 for t in fabry_perot_thicknesses_um(geom)]
-
-
-def oghma_y_mesh_nm(project: OghmaProject, ref_csv: Path | None = None) -> np.ndarray:
-    return oghma_y_mesh_um(project, ref_csv=ref_csv) * 1000.0

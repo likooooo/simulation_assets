@@ -6,9 +6,9 @@ from __future__ import annotations
 import pytest
 
 from oghma_fdtd import load_oghma_fdtd_detector_reference
-from oghma_runtime import init_oghma_test_session
+from oghma_runtime import bootstrap_tmm_session
 
-init_oghma_test_session()
+bootstrap_tmm_session(import_tmm=False)
 
 
 def test_load_fdtd_reference_missing_detector_raises(tmp_path):

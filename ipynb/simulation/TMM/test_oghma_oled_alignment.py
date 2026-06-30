@@ -12,15 +12,14 @@ from unittest.mock import patch
 import numpy as np
 
 from oghma_runtime import (
+    bootstrap_tmm_session,
     default_oled_hello_project,
-    get_simulation_module,
-    init_oghma_test_session,
     tmm_output_dir,
 )
 
-_REPO, _RUNTIME = init_oghma_test_session()
-_DEFAULT_OUT_DIR = tmm_output_dir("test_oghma_oled_alignment", _REPO)
-simulation = get_simulation_module()  # noqa: E402
+_, _RUNTIME = bootstrap_tmm_session(import_tmm=False)
+_DEFAULT_OUT_DIR = tmm_output_dir("test_oghma_oled_alignment")
+import simulation  # noqa: E402
 from oghma_core import (
     DEFAULT_RHO_U_MAX,
     DEFAULT_RHO_U_MIN,
@@ -558,7 +557,7 @@ def main() -> int:
     args = parse_oled_project_args(
         description="Run Oghma OLED alignment checks as a plain Python script.",
         default_out_dir=_DEFAULT_OUT_DIR,
-        default_project=default_oled_hello_project(_REPO),
+        default_project=default_oled_hello_project(),
     )
     project_dir = args.project_dir
 

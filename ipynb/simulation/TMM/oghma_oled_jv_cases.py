@@ -459,7 +459,6 @@ def run_oled_jv_alignment(
     profile: OledJvSolverProfile,
     simulation_module: Any,
     runtime_label: str,
-    repo_root: Path,
     argv: list[str] | None = None,
 ) -> int:
     parser = argparse.ArgumentParser(description=profile.description)
@@ -467,7 +466,7 @@ def run_oled_jv_alignment(
     parser.add_argument(
         "--out-dir",
         type=Path,
-        default=tmm_output_dir(profile.out_subdir, repo_root),
+        default=tmm_output_dir(profile.out_subdir),
         help="PNG output directory.",
     )
     parser.add_argument(
@@ -510,21 +509,19 @@ def main_for_profile(
     profile: OledJvSolverProfile,
     *,
     runtime_label: str,
-    repo_root: Path,
     argv: list[str] | None = None,
     simulation_module: Any | None = None,
 ) -> int:
     if simulation_module is None:
-        from oghma_runtime import prepare_simulation
+        from oghma_runtime import bootstrap_tmm_session
 
-        prepare_simulation()
+        bootstrap_tmm_session()
         import simulation as simulation_module  # noqa: WPS433
 
     return run_oled_jv_alignment(
         profile=profile,
         simulation_module=simulation_module,
         runtime_label=runtime_label,
-        repo_root=repo_root,
         argv=argv or [],
     )
 
@@ -548,13 +545,12 @@ def main_jv_cli(argv: list[str] | None = None) -> int:
     args, rest = parser.parse_known_args(argv)
     from oghma_runtime import bootstrap_tmm_session
 
-    repo, runtime, _ = bootstrap_tmm_session()
+    _, runtime, _ = bootstrap_tmm_session()
     import simulation  # noqa: WPS433
 
     return main_for_profile(
         _PROFILES[args.profile],
         runtime_label=str(runtime),
-        repo_root=repo,
         argv=rest,
         simulation_module=simulation,
     )

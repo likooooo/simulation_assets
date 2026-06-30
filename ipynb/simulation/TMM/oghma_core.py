@@ -66,11 +66,6 @@ def _tmm_layers_from_nk_thicknesses_um(
     return _tmm_layers_from_thicknesses_um(materials, thicknesses_um, simulation_module)
 
 
-def resolve_oghma_materials_root() -> Path:
-    """Return ``oghma_database/materials`` under ``SIMULATION_DATABASE_DIR`` (via ``materials_root()``)."""
-    return _simulation_database_parser().materials_root(init=True)
-
-
 @lru_cache(maxsize=256)
 def _read_oghma_material(material_path: str) -> Any:
     """Load material via simulation_database (sole supported resolution path)."""
@@ -905,18 +900,32 @@ def air_layer_thickness_um(project: OghmaProject) -> float:
 
 
 
+def _heatmap_grid_from_series(
+    wl: np.ndarray,
+    y_um: np.ndarray,
+    values: np.ndarray,
+) -> dict[str, Any]:
+    """Build (λ, y) grid from sparse heatmap CSV columns."""
+    wl_unique = np.unique(wl)
+    y_unique = np.unique(y_um)
+    grid = np.full((len(wl_unique), len(y_unique)), np.nan)
+    wl_to_i = {w: i for i, w in enumerate(wl_unique)}
+    y_to_i = {y: i for i, y in enumerate(y_unique)}
+    for w, y, v in zip(wl, y_um, values):
+        grid[wl_to_i[w], y_to_i[y]] = v
+    return {"heat_wl_um": wl_unique, "heat_y_um": y_unique, "grid": grid}
+
+
 def _heatmap_from_csv(path: Path) -> dict[str, Any]:
     heat = parse_oghma_csv(path)
-    wl_um = np.unique(_oghma_axis_to_um(heat["x"], heat["meta"], heatmap=True))
-    y_um = np.unique(_oghma_axis_to_um(heat["y"], heat["meta"], heatmap=True))
-    grid = np.full((len(wl_um), len(y_um)), np.nan)
-    wl_to_i = {w: i for i, w in enumerate(wl_um)}
-    y_to_i = {y: i for i, y in enumerate(y_um)}
     xs = _oghma_axis_to_um(heat["x"], heat["meta"], heatmap=True)
     ys = _oghma_axis_to_um(heat["y"], heat["meta"], heatmap=True)
-    for w, y, v in zip(xs, ys, heat["z"]):
-        grid[wl_to_i[w], y_to_i[y]] = v
-    return {"heat_wl_um": wl_um, "heat_y_um": y_um, "grid": grid}
+    grid_data = _heatmap_grid_from_series(xs, ys, heat["z"])
+    return {
+        "heat_wl_um": grid_data["heat_wl_um"],
+        "heat_y_um": grid_data["heat_y_um"],
+        "grid": grid_data["grid"],
+    }
 
 
 def load_oghma_optical_reference(project: OghmaProject | Path | str) -> dict[str, Any]:
@@ -1153,8 +1162,7 @@ def compare_stop_band_metrics(
 ) -> dict[str, float]:
     """Stop-band notch alignment: argmin wavelength delta and log-RMSE in notch region.
 
-    Returned keys ``stop_x_ours``, ``stop_x_baseline``, and ``stop_delta_nm`` are wavelength
-    values in μm (the ``stop_delta_nm`` key name is historical).
+    Returned keys ``stop_x_ours``, ``stop_x_baseline``, and ``stop_delta_um`` are in μm.
     """
     ours = np.asarray(ours, dtype=float)
     baseline = np.asarray(baseline, dtype=float)
@@ -1168,7 +1176,7 @@ def compare_stop_band_metrics(
     out: dict[str, float] = {
         "stop_x_ours": float(wl[i_ours]),
         "stop_x_baseline": float(wl[i_base]),
-        "stop_delta_nm": abs(float(wl[i_ours] - wl[i_base])),  # value in μm; key name is historical
+        "stop_delta_um": abs(float(wl[i_ours] - wl[i_base])),
     }
     if np.any(mask):
         out["stop_log_rmse"] = float(

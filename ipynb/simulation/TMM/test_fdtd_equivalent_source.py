@@ -26,10 +26,10 @@ from oghma_pytest_helpers import log_before_visualize, plot_compare_1d
 from oghma_runtime import bootstrap_tmm_session, oghma_project_dir
 
 _TMM = Path(__file__).resolve().parent
-_REPO, _RUNTIME, _ = bootstrap_tmm_session()
+_, _RUNTIME, _ = bootstrap_tmm_session()
 
-BRAGG_PROJECT = "oghma_projects/bragg_grating/01_hello_bragg_grating"
-FABRY_PROJECT = "oghma_projects/fabry_perot/01_hello_fabry_perot"
+BRAGG_PROJECT = ("bragg_grating", "01_hello_bragg_grating")
+FABRY_PROJECT = ("fabry_perot", "01_hello_fabry_perot")
 
 BRAGG_CASE_C_CORR_MIN = 0.95
 BRAGG_CASE_B_CORR_MIN = 0.85
@@ -132,7 +132,7 @@ def _evaluate_case_bc(
 
 def run_bragg_equivalent_source(sim, *, out_dir: Path) -> None:
     bundle = load_fdtd_alignment_bundle(
-        _REPO, BRAGG_PROJECT, parse_bragg_grating_geometry, normalize_i_new=False
+        *BRAGG_PROJECT, parse_geometry_fn=parse_bragg_grating_geometry, normalize_i_new=False
     )
     out = compute_bragg_emission_case_bc_spectra(
         sim,
@@ -157,7 +157,7 @@ def run_bragg_equivalent_source(sim, *, out_dir: Path) -> None:
 
 def run_fabry_equivalent_source(sim, *, out_dir: Path) -> None:
     bundle = load_fdtd_alignment_bundle(
-        _REPO, FABRY_PROJECT, parse_fabry_perot_geometry, normalize_i_new=False
+        *FABRY_PROJECT, parse_geometry_fn=parse_fabry_perot_geometry, normalize_i_new=False
     )
     out = compute_fabry_emission_case_bc_spectra(
         sim,
@@ -209,8 +209,8 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     sim = _load_simulation_module()
-    bragg_dir = oghma_project_dir("bragg_grating", "01_hello_bragg_grating", repo=_REPO)
-    fabry_dir = oghma_project_dir("fabry_perot", "01_hello_fabry_perot", repo=_REPO)
+    bragg_dir = oghma_project_dir(*BRAGG_PROJECT)
+    fabry_dir = oghma_project_dir(*FABRY_PROJECT)
     bragg_ok = (bragg_dir / "sim.json").is_file()
     fabry_ok = (fabry_dir / "sim.json").is_file()
 

@@ -12,14 +12,13 @@ from typing import Any
 import numpy as np
 
 from oghma_runtime import (
+    bootstrap_tmm_session,
     default_oled_hello_project,
-    get_simulation_module,
-    init_oghma_test_session,
     tmm_output_dir,
 )
 
-_REPO, _RUNTIME = init_oghma_test_session()
-simulation = get_simulation_module()  # noqa: E402
+_, _RUNTIME = bootstrap_tmm_session(import_tmm=False)
+import simulation  # noqa: E402
 from oghma_core import compare_metrics, load_oghma_optical_reference, load_oghma_project  # noqa: E402
 from oghma_oled_utils import (  # noqa: E402
     OLED_RT_GATES,
@@ -36,7 +35,7 @@ from oghma_pytest_helpers import (  # noqa: E402
     reciprocity_visualize,
 )
 
-DEFAULT_OUT_DIR = tmm_output_dir("test_oghma_oled_boundary_alignment", _REPO)
+DEFAULT_OUT_DIR = tmm_output_dir("test_oghma_oled_boundary_alignment")
 
 ITO_AL_LABEL = "ITO/Al bookends"
 AIR_LABEL = "air bookends (n=1)"
@@ -617,7 +616,7 @@ def main() -> int:
     args = parse_oled_project_args(
         description="Run OLED boundary R/T alignment checks (ito_al vs air bookends).",
         default_out_dir=DEFAULT_OUT_DIR,
-        default_project=default_oled_hello_project(_REPO),
+        default_project=default_oled_hello_project(),
     )
     project_dir = args.project_dir
 

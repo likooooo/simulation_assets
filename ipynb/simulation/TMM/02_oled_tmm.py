@@ -21,12 +21,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from oghma_runtime import oghma_project_dir, prepare_simulation, simulation_repo_root
+from oghma_runtime import bootstrap_tmm_session, DEFAULT_OLED_HELLO_PROJECT
 
-_RUNTIME = prepare_simulation()
-_REPO = simulation_repo_root()
+_, _RUNTIME, _ = bootstrap_tmm_session()
 import simulation  # noqa: E402
-from oghma_core import compare_metrics, load_oghma_optical_reference, load_oghma_project, resolve_oghma_materials_root  # noqa: E402
+import simulation_database_parser as sdp  # noqa: E402
+from oghma_core import load_oghma_optical_reference, load_oghma_project  # noqa: E402
+from oghma_fdtd_alignment import report_oled_metrics  # noqa: E402
 from oghma_oled_utils import (
     compute_oled_emission_stack_rt_ito_al,
     compute_oled_passive_rt_ito_al,
@@ -34,32 +35,7 @@ from oghma_oled_utils import (
 )
 from oghma_pytest_helpers import assert_rt_gate, rt_gate_passed  # noqa: E402
 
-DEFAULT_OLED_PROJECT = oghma_project_dir("oled", "01_hello_oled", repo=_REPO)
-
-
-def _report_metrics(
-    rows: list[dict],
-    name: str,
-    tmm: np.ndarray,
-    baseline: np.ndarray,
-    *,
-    x: np.ndarray | None = None,
-    rmse_thr: float,
-    max_thr: float,
-    min_corr: float | None = None,
-) -> dict:
-    stats = compare_metrics(tmm, baseline, x=x, peak_axis=0 if x is not None and np.ndim(tmm) == 1 else None)
-    ok = bool(stats["rmse"] < rmse_thr and stats["max_abs"] < max_thr)
-    if min_corr is not None and np.isfinite(stats.get("corr", np.nan)):
-        ok = ok and bool(stats["corr"] >= min_corr)
-    status = "PASS" if ok else "FAIL"
-    row = {"case": name, **stats, "status": status}
-    rows.append(row)
-    print(
-        f"[{status}] {name}: RMSE={stats['rmse']:.4g}, max|err|={stats['max_abs']:.4g}, "
-        f"corr={stats.get('corr', float('nan')):.4f}"
-    )
-    return stats
+DEFAULT_OLED_PROJECT = DEFAULT_OLED_HELLO_PROJECT
 
 
 def _plot_1d_compare(
@@ -128,7 +104,7 @@ def main() -> None:
 
     print(f"RUNTIME={_RUNTIME}")
     print(f"TMM_DIR={Path(__file__).resolve().parent}")
-    print(f"oghma_database/materials: {resolve_oghma_materials_root()}")
+    print(f"og/materials: {sdp.materials_root(init=True)}")
     print(f"project: {args.project}")
     print(f"simmode: {project.simmode}, thickness: {project.total_thickness_um:.3f} μm")
     print(f"λ: {wl_um[0]:.3f}–{wl_um[-1]:.3f} μm ({len(wl_um)} pts), θ={args.incident_angle_deg:g}°")
@@ -148,7 +124,7 @@ def main() -> None:
         incident_angle_rad=theta_rad,
     )
 
-    stats_r_pass = _report_metrics(
+    stats_r_pass = report_oled_metrics(
         alignment,
         "R(λ) passive vs baseline",
         r_pass,
@@ -158,7 +134,7 @@ def main() -> None:
         max_thr=OLED_RT_GATES["r_max"],
         min_corr=OLED_RT_GATES["r_corr"],
     )
-    stats_t_pass = _report_metrics(
+    stats_t_pass = report_oled_metrics(
         alignment,
         "T(λ) passive vs baseline",
         t_pass,
@@ -168,7 +144,7 @@ def main() -> None:
         max_thr=OLED_RT_GATES["t_max"],
         min_corr=None,
     )
-    stats_r_emis = _report_metrics(
+    stats_r_emis = report_oled_metrics(
         alignment,
         "R(λ) emission-stack vs baseline",
         r_emis,
@@ -178,7 +154,7 @@ def main() -> None:
         max_thr=OLED_RT_GATES["r_max"],
         min_corr=OLED_RT_GATES["r_corr"],
     )
-    stats_t_emis = _report_metrics(
+    stats_t_emis = report_oled_metrics(
         alignment,
         "T(λ) emission-stack vs baseline",
         t_emis,

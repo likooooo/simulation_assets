@@ -8,12 +8,11 @@ from pathlib import Path
 
 from oghma_oled_jv_cases import run_oled_jv_plot_workflow
 from oghma_oled_utils import DEFAULT_OLED_JV_PROJECT
-from oghma_runtime import prepare_simulation, simulation_repo_root
-from oghma_core import resolve_oghma_materials_root  # noqa: E402
+from oghma_runtime import bootstrap_tmm_session
 
-_RUNTIME = prepare_simulation()
-_REPO = simulation_repo_root()
+_, _RUNTIME, _ = bootstrap_tmm_session()
 import simulation  # noqa: E402
+import simulation_database_parser as sdp  # noqa: E402
 
 
 def main() -> None:
@@ -30,7 +29,7 @@ def main() -> None:
 
     print(f"RUNTIME={_RUNTIME}")
     print(f"solver={args.solver}")
-    print(f"oghma_database/materials: {resolve_oghma_materials_root()}")
+    print(f"og/materials: {sdp.materials_root(init=True)}")
     print(f"project: {args.project}")
 
     out_dir = run_oled_jv_plot_workflow(

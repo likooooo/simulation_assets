@@ -3,11 +3,7 @@
 #### Oghma ↔ TMM 对齐
 
 **ABC/PML 边界**：有限膜两侧各加厚度为 0 的半无限层（bookend），`nk` 取 Oghma 外侧介质，即等效 ABC。
-**nk对齐经验**：参考 _make_oghma_optical_material
-
-1. 用 wl_grid = union(wl_n, wl_alpha) 的公共波长网格
-2. 在该网格上 n 用插值、α 用插值、再按 Oghma 公式换算 k
-3. 再 material_s.from_tabulated(wl_grid, n_grid, k_grid)
+**nk对齐经验**：`_read_oghma_material()` → `simulation_database.read()` + `nk_at_wavelength_um()`
 
 #### Oghma 文件解析
 - `photons_escape_prob_yl2.csv` — escape 单点对齐基准（重写 `oled_escape` 模块时使用；旧验证脚本已移除）
@@ -26,7 +22,7 @@
 | Oghma JSON path                                               | OghmaNano 定义/语义                       | simulation 读取/语义            | 对齐结论     | 对齐动作                              |
 | ------------------------------------------------------------- | ------------------------------------- | --------------------------- | -------- | --------------------------------- |
 | `optical.outcoupling.outcoupling_model`                       | `off/transfer_matrix/ray_trace/unity` | `load_outcoupling_config()` | **一致**   | 保持同名；`transfer_matrix` → `u=[0]`  |
-| `optical.outcoupling.incoherent_wavelengths`                  | `struct outcoupling`                  | 已读                          | **一致**   | 保持                                |
+| `optical.outcoupling.incoherent_wavelengths`                  | `struct outcoupling`                  | `load_outcoupling_config()` 记录，**未传 TMM** | **未传 TMM** | 保持                                |
 | `optical.outcoupling.Dphotoneff`                              | 光子效率缩放                                | 未读（可选）                      | 字段存在     | P1 补读                             |
 | `optical.light_sources.lights.segment0.light_illuminate_from` | `y0/y1/xyz`                           | `load_outcoupling_config()` | **一致**   | OLED 固定 `y0`                      |
 | `optical.boundary.optical_y0/y1`                              | 边界标记字符串                               | 报告用                         | 仅校验      | 不映射为角参数                           |
@@ -54,7 +50,7 @@
 
 1. 从 `sim.json` 读取 `fdtd_src_waveform`（如 `gaus_sin`）与 `light_spectra`（如 `AM1.5G`）。
 2. 合成时域 `E(t)`（Oghma 手册：[FDTD 光源](https://www.oghma-nano.com/zh/manual/finite-difference-light-sources.html)），FFT 得功率谱 `S_E(f)=|E(f)|²`。
-3. 加载光谱包络 `Intensity(f)`（`simulation_database` → `oghma_database/spectra/AM1.5G.yml`，经 `_read_oghma_spectrum`）。
+3. 加载光谱包络 `Intensity(f)`（`simulation_database` → `og/spectra/AM1.5G.yml`，经 `_read_oghma_spectrum`）。
 4. **新源谱**（时间项已消除）：`I_new(f) = S_E(f) × Intensity(f)`。
 5. TMM：各 λ 用**单位振幅**单色波，得结构传递 `T(λ)`（及 `r(λ)`/`t(λ)`，经 `TMM_get_r_t_power` / `TMM_get_r_t_from_tmm`）。
 6. **非相干输出**：`S_out(λ) = I_new(λ) · T(λ)`。

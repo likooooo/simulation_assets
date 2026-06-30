@@ -8,10 +8,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from oghma_runtime import get_simulation_module, init_oghma_test_session, oghma_project_dir
+from oghma_runtime import bootstrap_tmm_session, oghma_project_dir
 
-init_oghma_test_session()
-simulation = get_simulation_module()
+_, _RUNTIME = bootstrap_tmm_session(import_tmm=False)
+import simulation  # noqa: E402
 
 from oghma_core import (
     _structure_pos_from_layers,

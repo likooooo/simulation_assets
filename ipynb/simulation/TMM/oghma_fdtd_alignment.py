@@ -23,14 +23,13 @@ from oghma_fdtd_source import (
     load_oghma_light_spectrum,
     parse_fdtd_light_source_config,
 )
-from oghma_runtime import simulation_runtime_dir
+from simulation_paths import resolve_artifacts_dir
 
 
 @dataclass
 class FdtdAlignmentBundle:
     """Single entry point for Oghma FDTD spectral alignment notebooks."""
 
-    repo: Path
     build: Path
     project_dir: Path
     sim_path: Path
@@ -48,10 +47,8 @@ class FdtdAlignmentBundle:
 
 
 def load_fdtd_alignment_bundle(
-    repo: Path,
-    project_relative: str,
+    *project_parts: str,
     parse_geometry_fn: Callable[[Path], Any],
-    *,
     normalize_i_new: bool = True,
 ) -> FdtdAlignmentBundle:
     """
@@ -59,7 +56,9 @@ def load_fdtd_alignment_bundle(
 
     Spectral baselines come only from :func:`load_oghma_fdtd_detector_reference`.
     """
-    project_dir = repo / "assets" / project_relative
+    from oghma_runtime import oghma_project_dir
+
+    project_dir = oghma_project_dir(*project_parts)
     sim_path = project_dir / "sim.json"
     if not sim_path.is_file():
         raise FileNotFoundError(sim_path)
@@ -78,9 +77,8 @@ def load_fdtd_alignment_bundle(
         peak = max(float(np.max(i_new)), 1e-30)
         i_new = i_new / peak
 
-    build = simulation_runtime_dir()
+    build = resolve_artifacts_dir()
     return FdtdAlignmentBundle(
-        repo=repo,
         build=build,
         project_dir=project_dir,
         sim_path=sim_path,
@@ -124,6 +122,31 @@ def pass_fail(
     return "PASS" if ok else "FAIL"
 
 
+def report_oled_metrics(
+    alignment_report: list[dict[str, Any]],
+    name: str,
+    tmm: np.ndarray,
+    baseline: np.ndarray,
+    *,
+    x: np.ndarray | None = None,
+    rmse_thr: float = 0.02,
+    max_thr: float = 0.05,
+    peak_thr: float | None = None,
+    min_corr: float | None = None,
+) -> dict[str, float]:
+    """OLED/optical notebooks: append compare row to *alignment_report* (not FdtdAlignmentBundle)."""
+    peak_axis = 0 if x is not None and np.ndim(tmm) == 1 else None
+    stats = compare_metrics(tmm, baseline, x=x, peak_axis=peak_axis)
+    status = pass_fail(stats, rmse_thr, max_thr, peak_thr=peak_thr, min_corr=min_corr)
+    row = {"case": name, **stats, "status": status}
+    alignment_report.append(row)
+    print(
+        f"[{status}] {name}: RMSE={stats['rmse']:.4g}, "
+        f"max|err|={stats['max_abs']:.4g}, corr={stats.get('corr', float('nan')):.4f}"
+    )
+    return stats
+
+
 def report_metrics(
     bundle: FdtdAlignmentBundle,
     name: str,
@@ -135,7 +158,7 @@ def report_metrics(
     max_thr: float = 0.3,
     peak_thr: float = 30.0,
     min_corr: float = 0.85,
-    stop_thr: float = 30.0,
+    stop_thr: float = 0.03,
     enforce_pass: bool = True,
     use_stop_band: bool = True,
 ) -> dict[str, float]:
@@ -143,19 +166,19 @@ def report_metrics(
     if use_stop_band and x is not None and np.ndim(tmm) == 1:
         stats.update(compare_stop_band_metrics(tmm, baseline, x))
     status = pass_fail(stats, rmse_thr, max_thr, peak_thr=peak_thr, min_corr=min_corr)
-    if enforce_pass and "stop_delta_nm" in stats:
-        status = "PASS" if status == "PASS" and stats["stop_delta_nm"] < stop_thr else "FAIL"
+    if enforce_pass and "stop_delta_um" in stats:
+        status = "PASS" if status == "PASS" and stats["stop_delta_um"] < stop_thr else "FAIL"
     row = {"case": name, **stats, "status": status}
     bundle.alignment_report.append(row)
     print(
         f"[{status}] {name}: RMSE={stats['rmse']:.4f}, "
         f"max|err|={stats['max_abs']:.4f}, corr={stats.get('corr', float('nan')):.4f}"
     )
-    if "stop_delta_nm" in stats:
+    if "stop_delta_um" in stats:
         print(
             f"  stop-band λ: ours={stats['stop_x_ours']:.4f} μm, "
             f"baseline={stats['stop_x_baseline']:.4f} μm, "
-            f"Δλ={stats['stop_delta_nm']:.4f} μm"
+            f"Δλ={stats['stop_delta_um']:.4f} μm"
         )
     return stats
 
@@ -170,8 +193,8 @@ def report_envelope_metrics(
     min_corr: float = 0.85,
     enforce_pass: bool = False,
 ) -> dict[str, float]:
-    pred_n = pred / max(float(np.max(pred)), 1e-30)
-    base_n = baseline / max(float(np.max(baseline)), 1e-30)
+    pred_n = peak_normalize_spectrum(pred)
+    base_n = peak_normalize_spectrum(baseline)
     stats = compare_metrics(pred_n, base_n, x=wl_um)
     stats.update(compare_stop_band_metrics(pred_n, base_n, wl_um))
     status = "PASS" if stats["corr"] >= min_corr else "FAIL"
@@ -191,7 +214,7 @@ def plot_1d_compare(
     title: str,
     baseline_name: str = "FDTD",
     *,
-    xlabel: str = "wavelength (nm)",
+    xlabel: str = "λ (μm)",
     tmm_label: str = "TMM",
     out_path: Path | str | None = None,
 ) -> None:
@@ -322,8 +345,8 @@ def evaluate_case(
             baseline_name,
             tmm_label=tmm_label,
         )
-        pred_n = pred / max(float(np.max(pred)), 1e-30)
-        base_n = baseline / max(float(np.max(baseline)), 1e-30)
+        pred_n = peak_normalize_spectrum(pred)
+        base_n = peak_normalize_spectrum(baseline)
         plot_1d_compare(
             wl_um,
             pred_n,
@@ -341,6 +364,7 @@ def evaluate_case(
         "rmse_norm": float(stats_norm["rmse"]),
         "log_domain": log_domain,
     }
+    return stats
 
 
 def plot_forward_source_diagnostic(
@@ -363,7 +387,7 @@ def plot_forward_source_diagnostic(
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
     axes[1].plot(bundle.wl_um, g_in, "b", label="|1+r|² @ z_detector_in")
-    axes[1].set_xlabel("λ (nm)")
+    axes[1].set_xlabel("λ (μm)")
     axes[1].set_ylabel("|1+r|²")
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
@@ -409,8 +433,8 @@ def plot_case_summary_grid(
         axes[i, 1].legend(fontsize=8)
         axes[i, 1].grid(True, alpha=0.3)
 
-    axes[-1, 0].set_xlabel("λ (nm)")
-    axes[-1, 1].set_xlabel("λ (nm)")
+    axes[-1, 0].set_xlabel("λ (μm)")
+    axes[-1, 1].set_xlabel("λ (μm)")
     plt.tight_layout()
     plt.show()
 
@@ -512,7 +536,7 @@ def display_alignment_reports(bundle: FdtdAlignmentBundle) -> None:
     _stop_um_labels = {
         "stop_x_ours": "stop_x_ours (μm)",
         "stop_x_baseline": "stop_x_baseline (μm)",
-        "stop_delta_nm": "stop_delta_nm (μm)",
+        "stop_delta_um": "stop_delta_um (μm)",
     }
 
     if bundle.case_summary:

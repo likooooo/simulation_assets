@@ -10,10 +10,10 @@ from typing import Any
 
 import numpy as np
 
-from oghma_runtime import init_oghma_test_session, oghma_project_dir
+from oghma_runtime import bootstrap_tmm_session, oghma_project_dir
 
 _TMM = Path(__file__).resolve().parent
-_REPO, _RUNTIME = init_oghma_test_session()
+_, _RUNTIME = bootstrap_tmm_session(import_tmm=False)
 
 from oghma_fdtd_alignment import plot_1d_compare  # noqa: E402
 from oghma_pytest_helpers import log_before_visualize, plot_compare_1d, wl_grid_um  # noqa: E402
@@ -52,20 +52,12 @@ FABRY_CHECKS = (
 )
 
 
-def _bragg_project_dir() -> Path:
-    return oghma_project_dir("bragg_grating", "01_hello_bragg_grating", repo=_REPO)
-
-
-def _fabry_project_dir() -> Path:
-    return oghma_project_dir("fabry_perot", "01_hello_fabry_perot", repo=_REPO)
-
-
 def _bragg_sim_path() -> Path:
-    return _bragg_project_dir() / "sim.json"
+    return oghma_project_dir("bragg_grating", "01_hello_bragg_grating") / "sim.json"
 
 
 def _fabry_sim_path() -> Path:
-    return _fabry_project_dir() / "sim.json"
+    return oghma_project_dir("fabry_perot", "01_hello_fabry_perot") / "sim.json"
 
 
 def _load_simulation_module():
@@ -455,8 +447,14 @@ def main() -> int:
     bragg_ok = _bragg_sim_path().is_file()
     fabry_ok = _fabry_sim_path().is_file()
 
-    print(f"Bragg project: {_bragg_project_dir()} ({'found' if bragg_ok else 'missing'})")
-    print(f"Fabry project: {_fabry_project_dir()} ({'found' if fabry_ok else 'missing'})")
+    print(
+        f"Bragg project: {oghma_project_dir('bragg_grating', '01_hello_bragg_grating')} "
+        f"({'found' if bragg_ok else 'missing'})"
+    )
+    print(
+        f"Fabry project: {oghma_project_dir('fabry_perot', '01_hello_fabry_perot')} "
+        f"({'found' if fabry_ok else 'missing'})"
+    )
     print(f"Output dir: {out_dir.resolve()}")
 
     checks: list[tuple[str, Any]] = []
