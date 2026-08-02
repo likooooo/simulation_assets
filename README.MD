@@ -31,7 +31,8 @@ toykits 根目录：`source scripts/init-toykits-build-env.sh` 后同样调用 `
 在 **simulation_core 根目录**：
 
 ```bash
-source 3rdparty/infrastructure/.venv/bin/activate
+# Python 依赖见 3rdparty/infrastructure/requirements.txt
+pip install -r 3rdparty/infrastructure/requirements.txt
 source 3rdparty/infrastructure/scripts/init-inf-build-env.sh
 pip install -r assets/ipynb/simulation/TMM/requirements.txt
 source scripts/init-simulation-build-env.sh

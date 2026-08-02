@@ -47,7 +47,7 @@ def create_wave_operator(shape, dx, epsilon_r, k0):
     KX, KY, KZ = np.meshgrid(kx, ky, kz, indexing='ij')
     k_sq = KX**2 + KY**2 + KZ**2
 
-    def matvec(v):
+    def matrix_apply(v):
         E_r = v.reshape(shape)
         # 频域项: \nabla^2
         E_k = fftn(E_r)
@@ -56,7 +56,7 @@ def create_wave_operator(shape, dx, epsilon_r, k0):
         term_space = (k0**2 * epsilon_r) * E_r
         return (term_diff + term_space).flatten()
 
-    return LinearOperator((N, N), matvec=matvec, dtype=complex)
+    return LinearOperator((N, N), matrix_apply=matrix_apply, dtype=complex)
 
 # 2. 预计算本征模态 (离线阶段)
 def precompute_modes(operator, num_modes=50):

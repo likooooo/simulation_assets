@@ -3,7 +3,7 @@
 #
 # Prerequisite (manual, every shell):
 #   source simulation_core/scripts/init-simulation-build-env.sh [build|build-asan]
-#   source simulation_core/3rdparty/infrastructure/.venv/bin/activate
+#   pip install -r simulation_core/3rdparty/infrastructure/requirements.txt
 #
 # TMM 属于 simulation_core 工作流，不依赖 simulation_toykits / init-toykits-build-env.sh。
 #
