@@ -42,7 +42,7 @@
 [`test_oghma_oled_alignment.py`](test_oghma_oled_alignment.py) 门控：
 
 - **OLED R/T**（`01_hello_oled` ITO/Al 栈）：使用 `oghma_oled_utils.OLED_RT_GATES`（滤光片用 `oghma_pytest_helpers.RT_R_*` 默认门限）。短波 UV（≈303 nm）材料 tabulated nk 外推导致 max|ΔR|≈0.088，故 R 门限宽于滤光片用 `RT_R_*`（0.005/0.012）。
-- 项目路径：`assets/oghma_projects/oled/01_hello_oled`；基准：`optical_output/reflect.csv`、`transmit.csv`。
+- 项目路径：`assets/database/og/oghma_projects/oled/01_hello_oled`；基准：`optical_output/reflect.csv`、`transmit.csv`。
 
 #### FDTD 光源 ↔ 普通 TMM
 
@@ -52,7 +52,7 @@
 2. 合成时域 `E(t)`（Oghma 手册：[FDTD 光源](https://www.oghma-nano.com/zh/manual/finite-difference-light-sources.html)），FFT 得功率谱 `S_E(f)=|E(f)|²`。
 3. 加载光谱包络 `Intensity(f)`（`simulation_database` → `og/spectra/AM1.5G.yml`，经 `_read_oghma_spectrum`）。
 4. **新源谱**（时间项已消除）：`I_new(f) = S_E(f) × Intensity(f)`。
-5. TMM：各 λ 用**单位振幅**单色波，得结构传递 `T(λ)`（及 `r(λ)`/`t(λ)`，经 `TMM_get_r_t_power` / `TMM_get_r_t_from_tmm`）。
+5. TMM：各 λ 用**单位振幅**单色波，得结构传递 `T(λ)`（及 `r(λ)`/`t(λ)`，经 `TMM_get_r_t_power_s` / `_p` / `TMM_get_r_t_from_tmm`）。
 6. **非相干输出**：`S_out(λ) = I_new(λ) · T(λ)`。
 7. **归一化传递比**（与 `lam_E_norm.csv` 对齐）：`S_out/S_in = T/G_in`，`G_in = |1+r|²`（源谱在比值中抵消）。
 8. **总能量**：`W = ∫ I_new(λ) T(λ) dλ`；绝对尺度取决于 FFT 归一化，形状对比用 peak-normalize。

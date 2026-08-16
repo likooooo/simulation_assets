@@ -1,10 +1,10 @@
-> **只读参考** — `OghmaNano/`、`oghma_projects/` 等为外部路径，不在本 submodule 内。
+> **只读参考** — OghmaNano / gpvdm 等求解器源码为**仓外**依赖，须自备克隆路径。本仓库内 Oghma 工程数据在 `assets/database/og/oghma_projects/`（可选本机 symlink `assets/oghma_projects`）。
 
 # Oghma sim.json ↔ OghmaNano ↔ simulation 接口映射
 
 [`00_software_alignment_skills.md`](00_software_alignment_skills.md) 的扩展：三层映射（C API ↔ Python ↔ C++；sim.json ↔ loader；sim.json ↔ simulation 入参）。
 
-参考实例：[`assets/oghma_projects/oled/02_oled_jv/sim.json`](../../../oghma_projects/oled/02_oled_jv/sim.json)（`simmode=segment0@jv`，`outcoupling_model=transfer_matrix`）。
+参考实例：[`assets/database/og/oghma_projects/oled/02_oled_jv/sim.json`](../../../database/og/oghma_projects/oled/02_oled_jv/sim.json)（`simmode=segment0@jv`，`outcoupling_model=transfer_matrix`）。
 
 ---
 
@@ -379,7 +379,7 @@ flowchart TD
 | OghmaNano JV parser | [`OghmaNano/oghma_core/plugins/jv/jv.c`](../../../../OghmaNano/oghma_core/plugins/jv/jv.c) |
 | OghmaNano 模板 | [`OghmaNano/oghma_core/libsavefile/json_template_*.c`](../../../../OghmaNano/oghma_core/libsavefile/) |
 | gpvdm PL loader | [`gpvdm/gpvdm_core/libdevice/epitaxy.c`](../../../../gpvdm/gpvdm_core/libdevice/epitaxy.c) |
-| 实例项目 | [`assets/oghma_projects/oled/02_oled_jv/`](../../../oghma_projects/oled/02_oled_jv/) |
+| 实例项目 | [`assets/database/og/oghma_projects/oled/02_oled_jv/`](../../../database/og/oghma_projects/oled/02_oled_jv/) |
 | pytest 对齐 | [`test_oghma_oled_alignment.py`](test_oghma_oled_alignment.py) |
 | JV pytest | [`test_oghma_oled_jv.py`](test_oghma_oled_jv.py)（`--profile default\|gummel\|newton`） |
 
