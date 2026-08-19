@@ -114,7 +114,7 @@ def load_oghma_light_spectrum(
     wl = np.asarray(wl_um, dtype=float)
     spec = _read_oghma_spectrum(name)
     out = np.asarray(
-        [spec.value_at_wavelength_um(float(w)) for w in wl],
+        [spec.irradiance_at_wavelength_um(float(w)) for w in wl],
         dtype=float,
     )
     return np.maximum(out, 0.0) * float(multiplier)
