@@ -179,7 +179,7 @@ def reciprocity_visualize(
     *,
     ignore_dc: bool = False,
 ) -> None:
-    """Plot via compare_data; output controlled by SAVE_TO_FILE env."""
+    """Plot via compare_data; output controlled by is_save_to_file() / enable_save_to_file()."""
     from compare_data import compare_data, py_pipe
 
     keys = [baseline_key, *others.keys()]

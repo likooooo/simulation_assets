@@ -12,7 +12,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import closed_loop_common as clc
+import closed_loop_common as clc  # loads db/mp before simulation
 import simulation as sim
 
 try:

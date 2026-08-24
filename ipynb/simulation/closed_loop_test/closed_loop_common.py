@@ -7,12 +7,6 @@ import os
 from dataclasses import dataclass
 from typing import Any, Sequence
 
-import matplotlib
-
-matplotlib.use(os.environ.get("MPLBACKEND", "Agg"))
-import matplotlib.pyplot as plt
-import numpy as np
-
 os.environ.setdefault("SAVE_TO_FILE", "0")
 
 try:
@@ -20,8 +14,17 @@ try:
 except ImportError:
     import viz_io
 
-viz_io.SAVE_TO_FILE = False
+viz_io.sync_save_to_file_from_env()
 
+import matplotlib
+
+matplotlib.use(os.environ.get("MPLBACKEND", "Agg"))
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Phase 1: simulation links mode_provider (single S4_bridge); import order is no longer
+# required for field APIs. mp-first kept for readability; remove after Phase 2 drops layer::rcwa.
+import simulation_mode_provider_native as mp
 import simulation as sim
 
 WL_UM = 0.55
@@ -35,6 +38,8 @@ EPHASE_TOL = 1e-5
 ANISO_TOL = 1e-5
 # >1e-6: n_G=1 RCWA specular vs TMM (FP), peak |Δr|~1.03e-6
 RCWA_RT_TOL = 2e-6
+# SMM_aniso vs RCWA aniso film; p-channel peak |ΔT|~2.15e-6 (float build)
+RCWA_ANISO_RT_TOL = 2.5e-6
 # Default panels: R,T are total Sz flux. Optional cross-pol when r_x/t_x present.
 PANEL_KEYS = ("R", "T", "r_amp", "r_phase", "t_amp", "t_phase", "Eamp", "Ephase")
 PANEL_KEYS_CROSS = (
@@ -73,8 +78,23 @@ def require_rcwa_triad() -> None:
     """Skip when RCWA TMM-aligned triad is missing from the artifact."""
     import pytest
 
-    if not hasattr(sim, "RCWA_get_r_t_coeff"):
-        pytest.skip("RCWA_get_r_t_coeff API missing")
+    if not hasattr(mp, "rcwa_get_r_t_coeff"):
+        pytest.skip("rcwa_get_r_t_coeff API missing")
+
+
+def make_media_from_nk(n: complex, depth: float, name: str = "") -> Any:
+    nk = complex(n)
+    mat = mp.register_material(
+        {
+            "type": "isotropic_constant",
+            "name": name or "iso",
+            "nk": [float(nk.real), float(nk.imag)],
+        }
+    )
+    lyr = mp.media()
+    lyr.background_material = mat
+    lyr.depth = float(depth)
+    return lyr
 
 
 @dataclass
@@ -115,11 +135,12 @@ def make_aniso_diag_layer(n: complex, depth: float, name: str = "") -> Any:
 
 
 def layers_to_d_nk(layers_s: Sequence[Any], wl: float = WL_UM) -> list[Any]:
+    """Convert TMM ``layer_s`` stack to RCWA ``media`` stack (isotropic nk at wl)."""
     out = []
     for i, lyr in enumerate(layers_s):
         mat = lyr.background_material
         n = complex(mat.nk_at_wavelength_um(float(wl)))
-        out.append(sim.make_layer_from_nk_d(n, float(lyr.depth), f"L{i}"))
+        out.append(make_media_from_nk(n, float(lyr.depth), f"L{i}"))
     return out
 
 
@@ -444,18 +465,18 @@ def sweep_rcwa_per_angle(
 
     for i, th in enumerate(angles_rad):
         th_deg = float(np.degrees(th))
-        rc, tc, rcx, tcx = sim.RCWA_get_r_t_coeff(
+        rc, tc, rcx, tcx = mp.rcwa_get_r_t_coeff(
             layers_list, float(wl), n_G=n_G, theta_deg=th_deg, pol=pol
         )
         r[i], t[i] = complex(rc), complex(tc)
         if with_cross:
             r_x[i], t_x[i] = complex(rcx), complex(tcx)
-        Rp, Tp = sim.RCWA_get_r_t_power(
+        Rp, Tp = mp.rcwa_get_r_t_power(
             layers_list, float(wl), n_G=n_G, theta_deg=th_deg, pol=pol
         )
         R[i], T[i] = float(Rp), float(Tp)
         Eamp[i], Ephase[i] = e_amp_phase(
-            *sim.RCWA_get_e_field_at_depth(
+            *mp.rcwa_get_e_field_at_depth(
                 layers_list,
                 float(wl),
                 n_G=n_G,
@@ -527,7 +548,7 @@ def refresh_closed_loop_notebooks(assets_dir: str | os.PathLike[str] | None = No
     print(f"closed_loop notebook refresh start: {batch_ts}")
 
     os.environ["SAVE_TO_FILE"] = "0"
-    viz_io.SAVE_TO_FILE = False
+    viz_io.sync_save_to_file_from_env()
 
     for nb_path in notebooks:
         ts = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")

@@ -7,6 +7,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+try:
+    from py_core_plugins import viz_io
+except ImportError:
+    import viz_io
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -240,8 +245,7 @@ def plot_1d_compare(
         path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(path, dpi=150)
     else:
-        save_to_file = os.environ.get("SAVE_TO_FILE", "0").lower() in ("true", "1", "yes")
-        if not save_to_file:
+        if not viz_io.is_save_to_file():
             plt.show()
     plt.close(fig)
 

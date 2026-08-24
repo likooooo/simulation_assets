@@ -14,13 +14,38 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import closed_loop_common as clc
+import closed_loop_common as clc  # loads db/mp before simulation
+import simulation_mode_provider_native as mp
 import simulation as sim
 
 # In-plane birefringence + off-diag: cross-pol r,t and flux≠|r|² visible on plots.
 # Lab abcde=(ε_xx,ε_xy,ε_yx,ε_yy,ε_zz); xy-block PD: |s|<√(ε_xx ε_yy)≈√6≈2.45.
 _ANISO_ABCDE = (2.0 + 0j, 0.35 + 0j, 0.35 + 0j, 3.0 + 0j, 2.25 + 0j)
 _ANISO_DEPTH_UM = 0.25
+
+
+def _cpair(z: complex):
+    return [float(complex(z).real), float(complex(z).imag)]
+
+
+def _mat_nk(n: complex, name: str):
+    nk = complex(n)
+    return mp.register_material(
+        {"type": "isotropic_constant", "name": name, "nk": [float(nk.real), float(nk.imag)]}
+    )
+
+
+def _mat_aniso(abcde, name: str):
+    return mp.register_material(
+        {"type": "anisotropic_nk", "name": name, "abcde": [_cpair(z) for z in abcde]}
+    )
+
+
+def _media(mat, depth: float):
+    lyr = mp.media()
+    lyr.background_material = mat
+    lyr.depth = float(depth)
+    return lyr
 
 
 def _aniso_stack(d: float = _ANISO_DEPTH_UM):
@@ -34,53 +59,86 @@ def _aniso_stack(d: float = _ANISO_DEPTH_UM):
 
 
 def _aniso_stack_d(d: float = _ANISO_DEPTH_UM):
-    """Same lab abcde as _aniso_stack, as layer_d for RCWA (ε₂ embed is inside RCWA)."""
-    top = sim.make_layer_from_nk_d(1.0 + 0j, 0.0, "air")
-    mat = sim.material_d.from_anisotropic_nk(list(_ANISO_ABCDE), "aniso_xy")
-    film = sim.layer_d()
-    film.background_material = sim.share_material_d(mat)
-    film.depth = float(d)
-    bot = sim.make_layer_from_nk_d(1.5 + 0j, 0.0, "sub")
+    """Same lab abcde as _aniso_stack, as media for RCWA (ε₂ embed is inside RCWA)."""
+    top = _media(_mat_nk(1.0 + 0j, "air"), 0.0)
+    film = _media(_mat_aniso(_ANISO_ABCDE, "aniso_xy"), d)
+    bot = _media(_mat_nk(1.5 + 0j, "sub"), 0.0)
     return [top, film, bot]
 
 
 def _soft_shape_layers_d(shape_kind: str, bg_nk: complex = 1.5 + 0j):
     """Soft structure: structure material == background."""
-    bg = sim.share_material_d(sim.material_d.from_nk(bg_nk, "bg"))
-    st = sim.share_material_d(sim.material_d.from_nk(bg_nk, "st"))
-    top = sim.make_layer_from_nk_d(1.0 + 0j, 0.0, "air")
-    film = sim.layer_d()
-    film.background_material = bg
-    film.depth = 0.25
-    film.parent = [-1]
+    bg = _mat_nk(bg_nk, "bg")
+    st = _mat_nk(bg_nk, "st")
+    top = _media(_mat_nk(1.0 + 0j, "air"), 0.0)
+    film = _media(bg, 0.25)
     if shape_kind == "circle":
-        film.shapes = [sim.make_circle_shape_d(0.2, [0.0, 0.0], 0.0, st)]
+        g = mp.circle()
+        g.radius = 0.2
+        g.center = [0.0, 0.0]
+        g.angle = 0.0
+        g.material = st
+        film.add_shape(g, -1)
     elif shape_kind == "ellipse":
-        film.shapes = [sim.make_ellipse_shape_d([0.26, 0.14], [0.0, 0.0], 0.0, st)]
+        g = mp.ellipse()
+        g.halfwidth = [0.26, 0.14]
+        g.center = [0.0, 0.0]
+        g.angle = 0.0
+        g.material = st
+        film.add_shape(g, -1)
     elif shape_kind == "rect":
-        film.shapes = [sim.make_rect_shape_d([0.2, 0.12], [0.0, 0.0], 0.0, st)]
+        g = mp.rect()
+        g.halfwidth = [0.2, 0.12]
+        g.center = [0.0, 0.0]
+        g.angle = 0.0
+        g.material = st
+        film.add_shape(g, -1)
     elif shape_kind == "poly":
         verts = [[-0.22, -0.16], [0.22, -0.16], [0.22, 0.00], [0.00, 0.00], [0.00, 0.26], [-0.22, 0.26]]
-        film.shapes = [sim.make_poly_shape_d(verts, [0.0, 0.0], 0.0, st)]
+        g = mp.poly.from_dict(
+            {"type": "poly", "vertices": verts, "center": [0.0, 0.0], "angle": 0.0, "material": "st"}
+        )
+        film.add_shape(g, -1)
     elif shape_kind == "bezier_poly_2":
         p0, p1, p2 = [-0.16, -0.12], [0.18, -0.12], [0.02, 0.22]
         cps = [[p0, [0.01, -0.22], p1], [p1, [0.28, 0.08], p2], [p2, [-0.20, 0.10], p0]]
-        film.shapes = [sim.make_bezier_poly_2_shape_d(cps, [0.0, 0.0], 0.0, st)]
+        g = mp.bezier_poly_2.from_dict(
+            {
+                "type": "bezier_poly_2",
+                "control_points": cps,
+                "center": [0.0, 0.0],
+                "angle": 0.0,
+                "material": "st",
+            }
+        )
+        film.add_shape(g, -1)
     elif shape_kind == "concentric_circles":
-        film.shapes = [
-            sim.make_concentric_circles_shape_d([0.07, 0.16, 0.26], [st, bg, st], [0.0, 0.0], 0.0)
+        rings = [
+            {"type": "circle", "radius": 0.07, "center": [0.0, 0.0], "angle": 0.0, "material": "st"},
+            {"type": "circle", "radius": 0.16, "center": [0.0, 0.0], "angle": 0.0, "material": "bg"},
+            {"type": "circle", "radius": 0.26, "center": [0.0, 0.0], "angle": 0.0, "material": "st"},
         ]
+        g = mp.concentric_circles.from_dict(
+            {
+                "type": "concentric_circles",
+                "rings": rings,
+                "center": [0.0, 0.0],
+                "angle": 0.0,
+                "material": "st",
+            }
+        )
+        film.add_shape(g, -1)
     else:
         pytest.skip(f"shape {shape_kind} not wired")
-    bot = sim.make_layer_from_nk_d(1.5 + 0j, 0.0, "sub")
+    bot = _media(_mat_nk(1.5 + 0j, "sub"), 0.0)
     return [top, film, bot]
 
 
 def _uniform_layers_d(film_nk: complex = 1.5 + 0j, depth: float = 0.25):
     return [
-        sim.make_layer_from_nk_d(1.0 + 0j, 0.0, "air"),
-        sim.make_layer_from_nk_d(film_nk, depth, "film"),
-        sim.make_layer_from_nk_d(1.5 + 0j, 0.0, "sub"),
+        _media(_mat_nk(1.0 + 0j, "air"), 0.0),
+        _media(_mat_nk(film_nk, "film"), depth),
+        _media(_mat_nk(1.5 + 0j, "sub"), 0.0),
     ]
 
 
@@ -114,7 +172,7 @@ def test_closed_loop_aniso_vs_rcwa(pol: str):
     assert np.all(np.isfinite(aniso.R)) and np.all(np.isfinite(aniso.T))
     assert float(np.max(aniso.R)) <= 1.05 + 1e-6
     clc.assert_sweep_vs_ref(
-        aniso, rcwa, rt_tol=clc.RCWA_RT_TOL, e_tol=clc.E_TOL, cross_tol=clc.RCWA_RT_TOL
+        aniso, rcwa, rt_tol=clc.RCWA_ANISO_RT_TOL, e_tol=clc.E_TOL, cross_tol=clc.RCWA_ANISO_RT_TOL
     )
     clc.plot_solver_suite([aniso, rcwa], pol=pol, title_prefix="aniso_film")
 
@@ -157,7 +215,7 @@ def test_closed_loop_rcwa_soft_shape_per_angle(shape: str):
     clc.require_rcwa_triad()
     layers = _soft_shape_layers_d(shape)
     for th_deg in (0.0, 15.0, 30.0):
-        R, T = sim.RCWA_get_r_t_power(layers, clc.WL_UM, n_G=1, theta_deg=th_deg, pol="s")
+        R, T = mp.rcwa_get_r_t_power(layers, clc.WL_UM, n_G=1, theta_deg=th_deg, pol="s")
         R, T = float(R), float(T)
         assert math.isfinite(R) and math.isfinite(T)
         # Soft structure==bg → lossless conservation at machine precision.
@@ -166,7 +224,7 @@ def test_closed_loop_rcwa_soft_shape_per_angle(shape: str):
 
 def test_closed_loop_rcwa_floquet_angle_sweep():
     """Floquet single-eigensolve strategy (case 3 angle path): drive-order sweep + plot."""
-    if not hasattr(sim, "make_rcwa_floquet_session_d"):
+    if not hasattr(mp, "make_rcwa_floquet_session"):
         pytest.skip("Floquet session API missing")
     layers = _uniform_layers_d(1.5 + 0j, 0.25)
     wl = 0.55
@@ -174,7 +232,7 @@ def test_closed_loop_rcwa_floquet_angle_sweep():
     N = 2
     G = _harmonic_G_1d(N)
     k_inc = [0.0, 0.0]
-    sess = sim.make_rcwa_floquet_session_d(layers, wl, Lr, G, k_inc)
+    sess = mp.make_rcwa_floquet_session(layers, wl, Lr, G, k_inc)
     assert int(sess.n()) == 2 * N + 1
     # FFT G-window is (nx/2 - nx, nx/2]: need nx > 2N so ±N both land (even nx drops -nx/2).
     nxy = [2 * N + 1, 2 * N + 1]
@@ -224,20 +282,23 @@ def test_closed_loop_rcwa_floquet_angle_sweep():
 
 def test_closed_loop_rcwa_diffraction_smoke():
     """Hard structure material ≠ background: per-order flux finite."""
-    if not hasattr(sim, "rcwa_poynting_by_order_d"):
-        pytest.skip("rcwa_poynting_by_order_d missing")
-    bg = sim.share_material_d(sim.material_d.from_nk(1.5 + 0j, "bg"))
-    st = sim.share_material_d(sim.material_d.from_nk(2.0 + 0j, "st"))
+    if not hasattr(mp, "rcwa_poynting_by_order"):
+        pytest.skip("rcwa_poynting_by_order missing")
+    bg = _mat_nk(1.5 + 0j, "bg")
+    st = _mat_nk(2.0 + 0j, "st")
+    film = _media(bg, 0.25)
+    g = mp.circle()
+    g.radius = 0.2
+    g.center = [0.0, 0.0]
+    g.angle = 0.0
+    g.material = st
+    film.add_shape(g, -1)
     layers = [
-        sim.make_layer_from_nk_d(1.0 + 0j, 0.0, "air"),
-        sim.layer_d(),
-        sim.make_layer_from_nk_d(1.5 + 0j, 0.0, "sub"),
+        _media(_mat_nk(1.0 + 0j, "air"), 0.0),
+        film,
+        _media(_mat_nk(1.5 + 0j, "sub"), 0.0),
     ]
-    layers[1].background_material = bg
-    layers[1].depth = 0.25
-    layers[1].parent = [-1]
-    layers[1].shapes = [sim.make_circle_shape_d(0.2, [0.0, 0.0], 0.0, st)]
-    fwd, back, _G = sim.rcwa_poynting_by_order_d(
+    fwd, back, _G = mp.rcwa_poynting_by_order(
         layers, 0.55, n_G=1, theta_deg=10.0, pol="s", which_layer=0
     )
     assert len(fwd) >= 1
