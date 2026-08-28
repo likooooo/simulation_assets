@@ -50,9 +50,11 @@ def _media(mat, depth: float):
 
 def _aniso_stack(d: float = _ANISO_DEPTH_UM):
     air = clc.make_iso_layer(1.0 + 0j, 0.0, "air")
-    mat = sim.material_s.from_anisotropic_nk(list(_ANISO_ABCDE), "aniso_xy")
-    film = sim.layer_s()
-    film.background_material = sim.share_material_s(mat)
+    mat = sim.anisotropic_nk.from_dict(
+        {"type": "anisotropic_nk", "name": "aniso_xy", "abcde": [_cpair(z) for z in _ANISO_ABCDE]}
+    )
+    film = sim.coating()
+    film.background_material = mat
     film.depth = float(d)
     sub = clc.make_iso_layer(1.5 + 0j, 0.0, "sub")
     return [air, film, sub]

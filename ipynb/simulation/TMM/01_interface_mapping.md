@@ -71,7 +71,7 @@ flowchart TB
 | `light_solve_optical_problem()` | 被动 R/T | `compute_oled_stack_rt_power_unpolarized()` | `TMM_solver_spectrum_rt_power_unpolarized_s` | ⚠️ |
 | `light_solve_lam_slice()` | 单 λ 切片 | `_compute_emission_transfer()` 等 | `TMM_emission_solver_spectrum_emission_transfer_s` | ⚠️ |
 | `light_src_load()` | 外部光源 | `load_outcoupling_config()` 读 `light_illuminate_from` | — | ⚠️ |
-| `light_import_epitaxy()` | epitaxy → nk 数组 | `build_oghma_oled_*_stack_ito_al()` | `material_s.from_tabulated` → `layer_s` | ⚠️ OLED 专用 stack |
+| `light_import_epitaxy()` | epitaxy → nk 数组 | `build_oghma_oled_*_stack_ito_al()` | `register_material` + `coating()` / `layers_from_formula` | ⚠️ OLED 专用 stack |
 | `light_build_materials_arrays()` | 构建复折射率场 | `_make_oghma_optical_material()` | `simulation_database.read()` → `database_material` | ✅ |
 | `light_cal_photon_density()` | 光子密度 | `load_oghma_photon_reference()` 读 CSV | — | ⚠️ 只读基准 |
 | `epitaxy_load()` / `shape_load_from_json()` | 层几何/材料 | `load_oghma_project()` | — | ⚠️ 子集字段 |
@@ -85,8 +85,8 @@ flowchart TB
 | `spectrum_reflection_coeff_unpolarized_s()` | `TMM_solver_spectrum_reflection_coeff_unpolarized_s` | 批量复 r(λ) |
 | `emission_rt_power_isotropic_at_z_py()` | `TMM_emission_solver_emission_rt_power_isotropic_at_z_s` | 各向同性 dipole R/T @ z |
 | `compute_oled_emission_stack_rt_ito_al()` | `TMM_emission_solve_equivalent_plane_wave_{s,p}_s` | 等效平面波 R/T |
-| `build_oghma_passive_stack()` | `layer_s`, `make_layer_from_nk_s` | 光学滤光片 stack |
-| `vacuum_reference_layers()` | `make_layer_from_nk_s(1+0j, …)` | outcoupling 参考真空 slab |
+| `build_oghma_passive_stack()` | `layers_from_formula` + `build_tmm_layers`（`coating` 栈） | 光学滤光片 stack |
+| `vacuum_reference_layers()` | `make_coating(...)`（`coating_solver_test_util`） | outcoupling 参考真空 slab |
 
 ### 1B. JV / 电学
 
@@ -225,8 +225,8 @@ gpvdm `contacts_load()` 读：`position`, `applied_voltage`, `majority`/`minorit
 | `optical.mesh.mesh_y.segment0.*` | y 网格 | `y_mesh_len_um`, `y_mesh_points`；`oghma_y_mesh_um()` **优先 outcoupling CSV** | len=0.52 μm, 200 pt | ⚠️ |
 | `optical.boundary.optical_y0/y1` | ABC 标记 | 校验；TMM 用 ITO/Al `depth=0` 半无限 bookend | `abc` / `abc` | ✅ |
 | `optical.light_sources.lights.segment0.light_illuminate_from` | `illuminate_from` | OLED 固定 ITO 侧 → `incident_angle_rad=0` | `y0` | ✅ |
-| `epitaxy.segmentN.optical_material` | materials path | `_make_oghma_optical_material()` → `layer_s.optical` | 如 `oxides/ITO/ito` | ✅ |
-| `epitaxy.segmentN.{y0,dy}` | 层厚 | `OghmaLayer.y0_um`, `thickness_um` → `layer_s.depth`；**z = y** | ITO @ y=0 | ✅ |
+| `epitaxy.segmentN.optical_material` | materials path | `_make_oghma_optical_material()` → `database_material` / `i_material` | 如 `oxides/ITO/ito` | ✅ |
+| `epitaxy.segmentN.{y0,dy}` | 层厚 | `OghmaLayer.y0_um`, `thickness_um` → `coating.depth`；**z = y** | ITO @ y=0 | ✅ |
 | `shape_pl.pl_emission_enabled` | `pl_enabled` | EML 识别；`oled_layer_params.radiative` | Alq3: `True` | ✅ |
 | `shape_pl.pl_experimental_emission_efficiency_f2f` | η_PL | `lp.eta_pl`, `load_oghma_emission_efficiency()` | `0.25` | ✅ |
 | `shape_pl.pl_input_spectrum` | 光谱文件 | `find_emission_spectrum_path()` → `compute_coupled_eqe_spectrum()` | `small_molecules/Alq3` | ✅ |
@@ -238,7 +238,7 @@ gpvdm `contacts_load()` 读：`position`, `applied_voltage`, `majority`/`minorit
 ```
 load_oghma_project + load_outcoupling_config
   → build_oghma_oled_emission_stack_ito_al(lam)
-      → material_s.from_tabulated(n,k) + layer_s(depth)
+      → register_material / database_material + coating(depth)
   → oghma_emission_u_values_from_project → u
   → TMM_emission_solver_emission_rt_power_isotropic_at_z_s(layers, wl, u, z)
 ```

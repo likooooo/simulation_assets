@@ -51,7 +51,9 @@ def diagnose_oled_stack(
     pos = _structure_pos_from_layers(layers)
     rows: list[dict[str, Any]] = []
     for i, layer in enumerate(layers):
-        nk = layer.background_material.nk_at_wavelength_um(float(lam_um))
+        from coating_solver_test_util import material_nk_at_wl
+
+        nk = material_nk_at_wl(layer.background_material, float(lam_um))
         z_start = float(pos[i]) if i < len(pos) else float("nan")
         z_end = float(pos[i + 1]) if i + 1 < len(pos) else float("nan")
         rows.append(
@@ -261,9 +263,11 @@ def compute_oled_emission_stack_rt(
 
     for wl in wl_arr:
         wl_f = float(wl)
+        from coating_solver_test_util import material_nk_at_wl
+
         layers_wl = build_layers(wl_f)
-        n1 = complex(layers_wl[0].background_material.nk_at_wavelength_um(wl_f))
-        n2 = complex(layers_wl[-1].background_material.nk_at_wavelength_um(wl_f))
+        n1 = material_nk_at_wl(layers_wl[0].background_material, wl_f)
+        n2 = material_nk_at_wl(layers_wl[-1].background_material, wl_f)
         u = n1 * np.sin(float(incident_angle_rad))
         u_c = complex(float(np.real(u)), float(np.imag(u)))
 

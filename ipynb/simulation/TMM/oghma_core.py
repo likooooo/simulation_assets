@@ -17,15 +17,15 @@ import simulation  # noqa: F401 — must load before simulation_database_parser
 SUBSTRATE_DEPTH_UM = 1000.0
 
 
-def _load_filmstack_funcs():
+def _load_coating_funcs():
     import simulation  # noqa: F401 — PYTHONPATH must include SIMULATION_ARTIFACTS_DIR
-    from filmstack_visualizer import build_tmm_layers, layers_from_formula
+    from coating_visualizer import build_tmm_layers, layers_from_formula
 
     return build_tmm_layers, layers_from_formula
 
 
 def _load_build_tmm_layers():
-    return _load_filmstack_funcs()[0]
+    return _load_coating_funcs()[0]
 
 
 def _tmm_layers_from_project_formula(
@@ -35,7 +35,7 @@ def _tmm_layers_from_project_formula(
     simulation_module: Any,
 ) -> list[Any]:
     del lam_um
-    build_tmm_layers, layers_from_formula = _load_filmstack_funcs()
+    build_tmm_layers, layers_from_formula = _load_coating_funcs()
     materials, thicknesses_um = layers_from_formula(
         formula, materials_db, simulation_module=simulation_module
     )
@@ -60,10 +60,12 @@ def _tmm_layers_from_nk_thicknesses_um(
     thicknesses_um: Sequence[float],
     simulation_module: Any,
 ) -> list[Any]:
-    materials = [
-        simulation_module.material_s.from_nk(complex(nk), "") for nk in nk_list
+    from coating_solver_test_util import make_coating
+
+    return [
+        make_coating(simulation_module, complex(nk), float(d), "")
+        for nk, d in zip(nk_list, thicknesses_um)
     ]
-    return _tmm_layers_from_thicknesses_um(materials, thicknesses_um, simulation_module)
 
 
 @lru_cache(maxsize=256)
@@ -103,11 +105,13 @@ def load_oghma_material_nk(
     material_path: str,
     wl_um: float | np.ndarray,
 ) -> complex | np.ndarray:
-    """Load dispersive nk via simulation_database (cached read + nk_at_wavelength_um)."""
+    """Load dispersive nk via simulation_database (cached read + nk_at)."""
+    from coating_solver_test_util import material_nk_at_wl
+
     mat = _read_oghma_material(material_path)
     wl_arr = np.atleast_1d(np.asarray(wl_um, dtype=float))
     nk = np.asarray(
-        [_cplx_from_py(mat.nk_at_wavelength_um(float(w))) for w in wl_arr],
+        [material_nk_at_wl(mat, float(w)) for w in wl_arr],
         dtype=complex,
     )
     if np.ndim(wl_um) == 0:
@@ -596,9 +600,11 @@ def u_escape_halfspace(
     ``u = n·sinθ`` is conserved; radiative modes in the exit medium satisfy ``|u| ≤ Re(n_out)``.
     For top ITO bookend this is ``n_ITO·sin(π/2) = Re(n_ITO)``, not 1.
     """
+    from coating_solver_test_util import material_nk_at_wl
+
     resolved = simulation_module.TMM_resolve_nk_depth_at_wl_s(layers, float(wl_um))
     bookend = resolved[0] if side == "top" else resolved[-1]
-    n_out = complex(bookend.background_material.nk_at_wavelength_um(float(wl_um)))
+    n_out = material_nk_at_wl(bookend.background_material, float(wl_um))
     return float(abs(n_out.real))
 
 
@@ -614,11 +620,13 @@ def u_propagation_limit_at_z(
     This is the ``P_total`` angular upper limit (``n_EML·sin(π/2)`` when the source
     sits in the emissive layer).
     """
+    from coating_solver_test_util import material_nk_at_wl
+
     resolved = simulation_module.TMM_resolve_nk_depth_at_wl_s(layers, float(wl_um))
     pos = simulation_module.TMM_get_structure_pos_s(resolved)
     layer_index, _ = simulation_module.TMM_find_in_structure_s(pos, float(z_um))
     layer = resolved[int(layer_index)]
-    n_layer = complex(layer.background_material.nk_at_wavelength_um(float(wl_um)))
+    n_layer = material_nk_at_wl(layer.background_material, float(wl_um))
     return float(abs(n_layer.real))
 
 
@@ -747,12 +755,12 @@ def tmm_stack_z_edges_from_layer_depths(
 ) -> list[float]:
     """Return z interface positions matching ``TMM_helper::get_structure_pos``.
 
-    Parameter name ``layer_depths_nm`` follows ``filmstack_visualizer`` (nm when
-    called from ``plot_filmstack``, which scales μm×1000). Oghma call sites pass
+    Parameter name ``layer_depths_nm`` follows ``coating_visualizer`` (nm when
+    called from ``plot_coating_stack``, which scales μm×1000). Oghma call sites pass
     μm layer depths directly; values are accumulated in the same unit as TMM
     ``layer.depth``.
     """
-    import filmstack_visualizer as fv
+    import coating_visualizer as fv
 
     return fv.tmm_stack_z_edges_from_layer_depths(
         layer_depths_nm, entry_bookend_below_z0=entry_bookend_below_z0
@@ -766,10 +774,10 @@ def tmm_stack_z_edges_from_bar_thicknesses(
 ) -> tuple[list[float], list[float]]:
     """Parse bar-chart thicknesses ``[0, *layer_depths*, 0]`` (μm) into z edges.
 
-    Forwards to ``filmstack_visualizer`` (internal param names use nm when the
+    Forwards to ``coating_visualizer`` (internal param names use nm when the
     filmstack plot path scales μm×1000). This wrapper expects **μm** depths.
     """
-    import filmstack_visualizer as fv
+    import coating_visualizer as fv
 
     return fv.tmm_stack_z_edges_from_bar_thicknesses(
         thicknesses_um, entry_bookend_below_z0=entry_bookend_below_z0
@@ -797,12 +805,13 @@ def _structure_pos_from_layers(layers: list[Any]) -> list[float]:
 def vacuum_reference_layers(simulation_module: Any, lam_um: float, thickness_um: float = 2.0):
     """Homogeneous vacuum slab for outcoupling enhancement reference."""
     del lam_um
-    air = simulation_module.material_s.from_nk(1.0 + 0.0j, "air")
-    return _tmm_layers_from_thicknesses_um(
-        [air, air],
-        [0.0, float(thickness_um)],
-        simulation_module,
-    )
+    from coating_solver_test_util import make_coating
+
+    air_nk = 1.0 + 0.0j
+    return [
+        make_coating(simulation_module, air_nk, 0.0, "air"),
+        make_coating(simulation_module, air_nk, float(thickness_um), "air"),
+    ]
 
 
 

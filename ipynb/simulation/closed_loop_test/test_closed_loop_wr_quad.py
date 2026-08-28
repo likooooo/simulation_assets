@@ -25,15 +25,15 @@ def films_stack():
 
 @pytest.fixture(scope="module")
 def W_sommerfeld(films_stack):
-    sim = wqc._ensure_sim()
-    return wqc.compute_wr(films_stack, quad=sim.wr_quadrature.sommerfeld)
+    mp = wqc._ensure_mp()
+    return wqc.compute_wr(films_stack, quad=mp.wr_quadrature.sommerfeld)
 
 
 def test_films_golden_gauss_laguerre_vs_sommerfeld(films_stack, W_sommerfeld):
-    sim = wqc._ensure_sim()
+    mp = wqc._ensure_mp()
     W_gl = wqc.compute_wr(
         films_stack,
-        quad=sim.wr_quadrature.gauss_laguerre,
+        quad=mp.wr_quadrature.gauss_laguerre,
         nx_laguerre=wqc.NX_LAGUERRE,
     )
     m = wqc.metrics(W_gl, W_sommerfeld)
@@ -50,10 +50,10 @@ def test_films_golden_gauss_laguerre_vs_sommerfeld(films_stack, W_sommerfeld):
 
 
 def test_films_golden_residue_series_vs_sommerfeld(films_stack, W_sommerfeld):
-    sim = wqc._ensure_sim()
+    mp = wqc._ensure_mp()
     W_res = wqc.compute_wr(
         films_stack,
-        quad=sim.wr_quadrature.residue_series,
+        quad=mp.wr_quadrature.residue_series,
         neff_resolution=wqc.RESIDUE_NEFF_RESOLUTION,
     )
     m = wqc.metrics(W_res, W_sommerfeld)

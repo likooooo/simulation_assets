@@ -120,28 +120,23 @@ def angle_grid_rad(n: int = ANGLE_N) -> np.ndarray:
 
 
 def make_iso_layer(n: complex, depth: float, name: str = "") -> Any:
-    return sim.make_layer_from_nk_s(complex(n), float(depth), name)
+    """Strategy B: uniform-film ``coating`` (replaces legacy ``layer_s``)."""
+    from coating_solver_test_util import make_coating
+
+    return make_coating(sim, n, depth, name)
 
 
 def make_aniso_diag_layer(n: complex, depth: float, name: str = "") -> Any:
-    eps = complex(n) * complex(n)
-    mat = sim.material_s.from_anisotropic_nk(
-        [eps, 0j, 0j, eps, eps], name or "aniso_diag"
-    )
-    lyr = sim.layer_s()
-    lyr.background_material = sim.share_material_s(mat)
-    lyr.depth = float(depth)
-    return lyr
+    from coating_solver_test_util import make_aniso_diag_coating
+
+    return make_aniso_diag_coating(sim, n, depth, name)
 
 
 def layers_to_d_nk(layers_s: Sequence[Any], wl: float = WL_UM) -> list[Any]:
-    """Convert TMM ``layer_s`` stack to RCWA ``media`` stack (isotropic nk at wl)."""
-    out = []
-    for i, lyr in enumerate(layers_s):
-        mat = lyr.background_material
-        n = complex(mat.nk_at_wavelength_um(float(wl)))
-        out.append(make_media_from_nk(n, float(lyr.depth), f"L{i}"))
-    return out
+    """Convert TMM ``coating`` stack to RCWA ``media`` stack (isotropic nk at wl)."""
+    from coating_solver_test_util import coatings_to_media_nk
+
+    return coatings_to_media_nk(layers_s, wl, mp)
 
 
 def e_amp_phase(ex, ey, ez) -> tuple[float, float]:

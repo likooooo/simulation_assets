@@ -78,8 +78,10 @@ def _fabry_film_nk_thickness_um(
     lam_um: float,
     simulation_module: Any,
 ) -> tuple[list[complex], list[float]]:
+    from coating_solver_test_util import material_nk_at_wl
+
     mirror_optical = _make_oghma_optical_material(simulation_module, geom.mirror_material)
-    mirror_nk = complex(mirror_optical.nk_at_wavelength_um(float(lam_um)))
+    mirror_nk = material_nk_at_wl(mirror_optical, float(lam_um))
     return (
         [mirror_nk, complex(geom.cavity_nk), mirror_nk],
         [
@@ -372,9 +374,11 @@ def fabry_perot_interface_R_at_wl(
     """Power reflectivity R at air|mirror via TMM (``air|mirror slab|air``)."""
     wl_arr = np.atleast_1d(np.asarray(wl_um, dtype=float))
     mirror_optical = _make_oghma_optical_material(simulation_module, geom.mirror_material)
+    from coating_solver_test_util import material_nk_at_wl
+
     r_list: list[float] = []
     for wl in wl_arr:
-        mirror_nk = complex(mirror_optical.nk_at_wavelength_um(float(wl)))
+        mirror_nk = material_nk_at_wl(mirror_optical, float(wl))
         layers = _tmm_layers_from_nk_thicknesses_um(
             [1.0 + 0.0j, mirror_nk, 1.0 + 0.0j],
             [0.0, float(geom.mirror_thickness_um), 0.0],

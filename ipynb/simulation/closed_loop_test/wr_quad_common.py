@@ -30,33 +30,61 @@ REL_FRO_TOL = 1e-3
 ABS_W00_TOL = 1e-4
 
 
-def _ensure_sim() -> Any:
+def _artifact_dir() -> str:
     art = os.environ.get("SIMULATION_ARTIFACTS_DIR", "").strip()
-    if not art:
-        default = os.path.expanduser(
-            "~/repos/simulation_toykits/simulation_core/build"
-        )
-        if os.path.isfile(os.path.join(default, "simulation.so")):
-            os.environ["SIMULATION_ARTIFACTS_DIR"] = default
-            art = default
     if art:
-        import sys
+        return art
+    # Prefer the directory that already contains the loaded natives on PYTHONPATH.
+    import sys
 
-        if art not in sys.path:
+    for p in sys.path:
+        if os.path.isfile(os.path.join(p, "simulation.so")):
+            return p
+    default = os.path.expanduser("~/repos/simulation_toykits/simulation_core/build")
+    if os.path.isfile(os.path.join(default, "simulation.so")):
+        return default
+    return ""
+
+
+def _ensure_sim() -> Any:
+    art = _artifact_dir()
+    if art:
+        os.environ["SIMULATION_ARTIFACTS_DIR"] = art
+        if art not in __import__("sys").path:
+            import sys
+
             sys.path.insert(0, art)
     import simulation as sim
 
     return sim
 
 
+def _ensure_mp() -> Any:
+    _ensure_sim()
+    import simulation_mode_provider_native as mp
+
+    return mp
+
+
+def _uniform_media(nk: complex, depth: float, name: str) -> Any:
+    sim = _ensure_sim()
+    n = complex(nk)
+    sim.register_material(
+        {"type": "isotropic_constant", "name": name, "nk": [float(n.real), float(n.imag)]}
+    )
+    layer = sim.media()
+    layer.background_material = sim.query_material(name)
+    layer.depth = float(depth)
+    return layer
+
+
 def films_golden_stack() -> list[Any]:
     """Top→bottom: amb(1,0) | f1(1.6,40) | f2(2.0,30) | sub(1.5,0)."""
-    sim = _ensure_sim()
     return [
-        sim.make_layer_from_nk_d(complex(N_MED), 0.0, "amb"),
-        sim.make_layer_from_nk_d(1.6 + 0j, 40.0, "f1"),
-        sim.make_layer_from_nk_d(2.0 + 0j, 30.0, "f2"),
-        sim.make_layer_from_nk_d(1.5 + 0j, 0.0, "sub"),
+        _uniform_media(complex(N_MED), 0.0, "wr_amb"),
+        _uniform_media(1.6 + 0j, 40.0, "wr_f1"),
+        _uniform_media(2.0 + 0j, 30.0, "wr_f2"),
+        _uniform_media(1.5 + 0j, 0.0, "wr_sub"),
     ]
 
 
@@ -76,14 +104,14 @@ def compute_wr(
     wr_pole_im_max: float = WR_POLE_IM_MAX,
     auto_neff_cap_from_z: int = AUTO_NEFF_CAP_FROM_Z,
 ) -> np.ndarray:
-    sim = _ensure_sim()
+    mp = _ensure_mp()
     if stack is None:
         stack = films_golden_stack()
     if quad is None:
-        quad = sim.wr_quadrature.sommerfeld
+        quad = mp.wr_quadrature.sommerfeld
     omega = 2.0 * np.pi / float(wl)
     k_med = complex(n_med) * omega
-    W = sim.compute_layer_mediated_coupling_self_d(
+    W = mp.compute_media_mediated_coupling_self(
         stack,
         k_med,
         float(wl),

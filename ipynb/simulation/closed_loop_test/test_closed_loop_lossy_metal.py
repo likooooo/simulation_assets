@@ -38,10 +38,12 @@ def _metal_spr():
 
 
 def _aniso_diag_copy(layers_s):
+    from coating_solver_test_util import coating_nk_at_wl
+
     out = []
     for lyr in layers_s:
-        n = complex(lyr.background_material.nk_at_wavelength_um(clc.WL_UM))
-        out.append(clc.make_aniso_diag_layer(n, float(lyr.depth), lyr.background_material.name))
+        n = coating_nk_at_wl(lyr.background_material, clc.WL_UM)
+        out.append(clc.make_aniso_diag_layer(n, float(lyr.depth), lyr.background_material.name()))
     return out
 
 

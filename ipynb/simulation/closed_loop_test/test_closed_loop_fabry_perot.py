@@ -17,7 +17,7 @@ import simulation as sim
 
 try:
     from simulation_database_parser import materials_db_from_token_paths
-    from filmstack_visualizer import layers_from_formula
+    from coating_visualizer import _make_coating_from_material, layers_from_formula
 except ImportError:
     materials_db_from_token_paths = None  # type: ignore
     layers_from_formula = None  # type: ignore
@@ -34,7 +34,7 @@ _FABRY_PEROT_FORMULA = (
 
 def _fabry_perot_layers_s():
     if materials_db_from_token_paths is None or layers_from_formula is None:
-        pytest.skip("filmstack_visualizer / simulation_database_parser not importable")
+        pytest.skip("coating_visualizer / simulation_database_parser not importable")
     path_entries = {}
     for keys in _FABRY_PEROT_MATERIAL_PATH_KEYS:
         token = Path(keys[-1]).stem
@@ -45,18 +45,17 @@ def _fabry_perot_layers_s():
     )
     layers = []
     for m, d in zip(mats, depths):
-        lyr = sim.layer_s()
-        lyr.background_material = sim.share_material_s(m)
-        lyr.depth = float(d)
-        layers.append(lyr)
+        layers.append(_make_coating_from_material(sim, m, float(d)))
     return layers
 
 
 def _aniso_diag_copy(layers_s):
+    from coating_solver_test_util import coating_nk_at_wl
+
     out = []
     for lyr in layers_s:
-        n = complex(lyr.background_material.nk_at_wavelength_um(clc.WL_UM))
-        out.append(clc.make_aniso_diag_layer(n, float(lyr.depth), lyr.background_material.name))
+        n = coating_nk_at_wl(lyr.background_material, clc.WL_UM)
+        out.append(clc.make_aniso_diag_layer(n, float(lyr.depth), lyr.background_material.name()))
     return out
 
 

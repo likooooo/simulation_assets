@@ -59,5 +59,5 @@
 
 #### VirtualLab ↔ TMM（椭偏 Δ）
 
-- TMM 内部：`Δ_internal = arg(−ρ)`，`ρ = r_p / r_s`（`filmstack_visualizer.compute_psi_delta`）
+- TMM 内部：`Δ_internal = arg(−ρ)`，`ρ = r_p / r_s`（`coating_visualizer.compute_psi_delta`）
 - VirtualLab 绘图：`Δ_VL = 180° − Δ_internal`（弧度下等价 `π − Δ_TMM`，`Δ_TMM = Δ_internal`）

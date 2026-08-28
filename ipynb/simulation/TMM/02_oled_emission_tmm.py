@@ -29,7 +29,7 @@ from oghma_core import (  # noqa: E402
     load_oghma_project,
     plot_2d_compare,
 )
-from filmstack_visualizer import build_tmm_layers, layers_from_formula, plot_filmstack  # noqa: E402
+from coating_visualizer import build_tmm_layers, layers_from_formula, plot_coating_stack  # noqa: E402
 from oghma_fdtd_alignment import plot_1d_compare, report_oled_metrics  # noqa: E402
 from oghma_oled_utils import oled_emission_formula_from_project, oled_emission_materials_db  # noqa: E402
 from oghma_oled_utils import (  # noqa: E402
@@ -112,7 +112,7 @@ def main() -> None:
     formula = oled_emission_formula_from_project(project)
     db = oled_emission_materials_db(project)
     materials, thicknesses_um = layers_from_formula(formula, db, simulation_module=simulation)
-    plot_filmstack(
+    plot_coating_stack(
         build_tmm_layers(materials, thicknesses_um, simulation_module=simulation),
         title="Filmstack (z=0 @ ITO epitaxy, +z → Al; ITO/Al semi-inf via depth=0)",
         entry_bookend_below_z0=True,

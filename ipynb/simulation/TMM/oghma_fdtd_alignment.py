@@ -513,13 +513,13 @@ def plot_fdtd_stack_section(
     entry_bookend_below_z0: bool = False,
 ) -> None:
     """TMM stack bar chart plus FDTD source/detector/stack marker timeline."""
-    from filmstack_visualizer import build_tmm_layers, layers_from_formula, plot_filmstack
+    from coating_visualizer import build_tmm_layers, layers_from_formula, plot_coating_stack
 
     materials, thicknesses_um = layers_from_formula(
         formula, materials_db, simulation_module=simulation_module
     )
     layers = build_tmm_layers(materials, thicknesses_um, simulation_module=simulation_module)
-    plot_filmstack(
+    plot_coating_stack(
         layers,
         title=stack_title,
         entry_bookend_below_z0=entry_bookend_below_z0,

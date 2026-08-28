@@ -83,8 +83,10 @@ def _bragg_period_nk_thickness_um(
     lam_um: float,
     simulation_module: Any,
 ) -> tuple[list[complex], list[float]]:
+    from coating_solver_test_util import material_nk_at_wl
+
     optical_high = _make_oghma_optical_material(simulation_module, geom.high_material)
-    high_nk = complex(optical_high.nk_at_wavelength_um(float(lam_um)))
+    high_nk = material_nk_at_wl(optical_high, float(lam_um))
     nk_list: list[complex] = []
     thicknesses_um: list[float] = []
     for _ in range(geom.n_periods):
